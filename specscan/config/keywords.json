@@ -1,0 +1,79 @@
+{
+  "_comment": "Edit this file to customize what SpecScan looks for. No coding required. 'keywords' is a flat list of phrases/regex flagged under the 'Keywords' section of the report. Each entry can be a plain phrase (case-insensitive, matched as a whole word/phrase) or an object with 'label' and 'pattern' (a regex) for more control.",
+
+  "keywords": [
+    "allowance",
+    "unit price",
+    "or equal",
+    "or approved equal",
+    "substitution",
+    "liquidated damages",
+    "warranty period",
+    "extended warranty",
+    "shop drawings",
+    "mock-up",
+    "mockup",
+    "pre-installation meeting",
+    "coordination",
+    "LEED",
+    "commissioning",
+    "field verify",
+    "field measure",
+    "owner furnished",
+    "owner-furnished",
+    "contractor furnished",
+    "sales tax",
+    "bond",
+    "retainage",
+    "schedule of values",
+    "value engineering",
+    "phasing",
+    "hazardous material",
+    "asbestos",
+    "prevailing wage",
+    "davis-bacon"
+  ],
+
+  "categories": {
+    "alternates": {
+      "label": "Alternates",
+      "patterns": [
+        "\\balternate\\s*(no\\.?|number|#)?\\s*\\d+\\b",
+        "\\badd\\s+alternate\\b",
+        "\\bdeduct\\s+alternate\\b",
+        "\\bvoluntary\\s+alternate\\b",
+        "\\balternates?\\s+schedule\\b",
+        "\\bsection\\s*01\\s*23\\s*00\\b"
+      ]
+    },
+    "basis_of_design": {
+      "label": "Basis of Design",
+      "patterns": [
+        "\\bbasis\\s+of\\s+design\\b",
+        "\\bB\\.?O\\.?D\\.?\\b",
+        "\\backnowledged\\s+manufacturer\\b",
+        "\\bnamed\\s+manufacturer\\b"
+      ]
+    },
+    "base_bid": {
+      "label": "Base Bid",
+      "patterns": [
+        "\\bbase\\s+bid\\b",
+        "\\bbase\\s+bid\\s+price\\b",
+        "\\bcontract\\s+sum\\b"
+      ]
+    },
+    "attic_stock": {
+      "label": "Attic Stock",
+      "patterns": [
+        "\\battic\\s+stock\\b",
+        "\\bextra\\s+stock\\b",
+        "\\bextra\\s+materials?\\b",
+        "\\bmaintenance\\s+stock\\b",
+        "\\bmaintenance\\s+materials?\\b",
+        "\\bspare\\s+parts?\\b",
+        "\\boverage\\s+materials?\\b"
+      ]
+    }
+  }
+}

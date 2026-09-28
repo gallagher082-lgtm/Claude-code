@@ -1,0 +1,24 @@
+[project]
+name = "specscan"
+version = "0.1.0"
+description = "Local, offline construction specification analyzer"
+requires-python = ">=3.10"
+dependencies = [
+    "pdfplumber>=0.11",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+]
+
+[project.scripts]
+specscan = "specscan.cli:main"
+specscan-gui = "specscan.gui:main"
+
+[tool.setuptools.packages.find]
+include = ["specscan*"]
+
+[tool.setuptools.package-data]
+"specscan.config" = ["*.json"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
