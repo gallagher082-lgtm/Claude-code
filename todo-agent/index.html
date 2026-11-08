@@ -1,0 +1,440 @@
+<title>Errand Runner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow column — a dispatch board. Header with the one button, an intake box, then a stack of task tickets. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #16202e;
+  --muted: #5d6b7e;
+  --line: #d9dfe7;
+  --accent: #2346c9;
+  --accent-ink: #ffffff;
+  --ok: #1d7a4c;
+  --warn: #a35a00;
+  --ask: #7a3fb8;
+  --bad: #b3261e;
+  --chip: #e8ecf3;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Instrument Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141c; --surface: #171e29; --ink: #e6ebf2; --muted: #93a0b3; --line: #2a3443;
+  --accent: #7d97ff; --accent-ink: #0d1430; --ok: #5ccf94; --warn: #f0a94b; --ask: #c39bf2; --bad: #ff8a80; --chip: #222b39;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f141c; --surface: #171e29; --ink: #e6ebf2; --muted: #93a0b3; --line: #2a3443;
+  --accent: #7d97ff; --accent-ink: #0d1430; --ok: #5ccf94; --warn: #f0a94b; --ask: #c39bf2; --bad: #ff8a80; --chip: #222b39;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.wrap { max-width: 720px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px; }
+h1 { font: 700 2rem/1.1 var(--f-display); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 60ch; }
+.head { display: grid; gap: 16px; }
+.runbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.tally { font: 500 12px/1 var(--f-mono); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; display: flex; gap: 12px; flex-wrap: wrap; }
+.tally b { color: var(--ink); font-weight: 500; }
+
+button { font: 600 14px/1 var(--f-body); border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 10px 14px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); padding: 14px 20px; font-size: 15px; }
+button.go { background: var(--ok); color: var(--surface); border-color: var(--ok); }
+button.quiet { background: transparent; border-color: transparent; color: var(--muted); padding: 8px 10px; }
+button.quiet:hover { color: var(--ink); }
+
+.intake { display: grid; gap: 10px; }
+.intake label { font: 500 12px/1 var(--f-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+textarea, input[type=text] { width: 100%; font: 15px/1.45 var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+textarea { resize: vertical; }
+#intake-text { min-height: 120px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.hint { color: var(--muted); font-size: 13px; }
+
+.notice { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.notice.bad { border-color: var(--bad); color: var(--bad); }
+
+.list { display: grid; gap: 12px; }
+.empty { border: 1px dashed var(--line); border-radius: 12px; padding: 28px 18px; text-align: center; color: var(--muted); }
+.ticket { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.ticket.attn { border-color: var(--warn); }
+.ticket.ask { border-color: var(--ask); }
+.t-top { display: flex; gap: 12px; align-items: flex-start; }
+.t-text { flex: 1; min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+.ticket.done .t-text { color: var(--muted); }
+.pill { flex: none; font: 500 11px/1 var(--f-mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.pill.working { color: var(--accent); }
+.pill.working::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; animation: blink 1s infinite; }
+.pill.needs_approval { color: var(--warn); }
+.pill.needs_you { color: var(--ask); }
+.pill.done { color: var(--ok); }
+.pill.cant_do, .pill.failed { color: var(--bad); }
+@keyframes blink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .pill.working::before { animation: none; } }
+.log { font: 500 12px/1.4 var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.question { color: var(--ask); font-weight: 500; }
+
+.prop { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.prop-h { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.prop-kind { font: 500 11px/1 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--warn); }
+.prop-why { color: var(--muted); font-size: 13px; }
+.field { display: grid; gap: 3px; }
+.field span { font: 500 11px/1 var(--f-mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.field textarea { min-height: 140px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 480px) { .two { grid-template-columns: 1fr; } }
+.prop-state { font-size: 13px; color: var(--muted); }
+.prop-state.ok { color: var(--ok); }
+.prop-state.bad { color: var(--bad); }
+.confirm { background: var(--chip); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; font-size: 14px; }
+a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <h1>Errand Runner</h1>
+      <p class="sub">Paste your whole list. One tap sends a helper after each task at the same time. They read your email, calendar and Drive, and anything that would send or invite someone waits here for your OK.</p>
+    </div>
+    <div class="runbar">
+      <button class="primary" id="run-all" type="button">Work through my list</button>
+      <button id="stop-all" type="button" hidden>Stop</button>
+      <div class="tally" id="tally"></div>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <section class="intake">
+    <label for="intake-text">Add to the list, one task per line</label>
+    <textarea id="intake-text" placeholder="Reply to Dana about the venue deposit&#10;Find a time next week for coffee with sam@example.com&#10;Dig up last year's insurance renewal from Drive and tell me the due date"></textarea>
+    <div class="row">
+      <button id="add" type="button">Add tasks</button>
+      <span class="hint">Bullets and numbers are stripped. Your list is private to you.</span>
+    </div>
+  </section>
+
+  <section class="list" id="list" aria-live="polite">
+    <div class="empty">Loading your list…</div>
+  </section>
+
+  <div class="row">
+    <button class="quiet" id="clear-done" type="button">Clear finished tasks</button>
+    <button class="quiet" id="perm" type="button">Permissions</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const listEl = $("#list"), noticeEl = $("#notice"), tallyEl = $("#tally");
+  const runBtn = $("#run-all"), stopBtn = $("#stop-all");
+
+  let db = null, sample = null, mcp = null, perms = null, uid = null, col = null;
+  let tasks = [];                 // [{id, ...data}]
+  const running = new Map();      // id -> {ctl, log}
+  const confirmFor = new Set();   // proposal keys showing the "are you sure" step
+  const writeChains = new Map();  // id -> promise (one write at a time per doc)
+  let loaded = false;
+  const MAX_PARALLEL = 3;
+
+  const GMAIL = "Gmail", CAL = "Google Calendar", DRIVE = "Google Drive";
+
+  function notice(msg, bad) {
+    if (!msg) { noticeEl.hidden = true; return; }
+    noticeEl.textContent = msg; noticeEl.className = "notice" + (bad ? " bad" : ""); noticeEl.hidden = false;
+  }
+
+  function write(id, data, mode = "update") {
+    const ref = col.doc(id);
+    const prev = writeChains.get(id) || Promise.resolve();
+    const next = prev.catch(() => {}).then(() => mode === "set" ? ref.set(data) : mode === "delete" ? ref.delete() : ref.update(data));
+    writeChains.set(id, next);
+    return next.catch((e) => { notice(e?.code === "quota_exceeded" ? "Your list is full. Clear finished tasks to make room." : "Couldn't save a change (" + (e?.code || "error") + "). Try again.", true); throw e; });
+  }
+
+  // ---------- boot ----------
+  (async () => {
+    const [d, s, m, u, p] = await Promise.all(["db", "sample", "mcp", "user", "permissions"].map((n) => claude.use(n).catch(() => null)));
+    db = d; sample = s; mcp = m; perms = p;
+    uid = u ? await u.id().catch(() => null) : null;
+    if (!db || !uid) {
+      loaded = true; tasks = []; render();
+      notice("Open this page signed in to Claude to keep a list here.", true);
+      return;
+    }
+    if (!sample) notice("Claude isn't available on this view, so tasks can be listed but not worked on.", true);
+    col = db.collection("data/users/" + uid);
+    const timer = setTimeout(() => { if (!loaded) notice("Your list can't be reached yet. It will appear when the connection comes back."); }, 10000);
+    col.orderBy("created").onSnapshot((snap) => {
+      tasks = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      if (!snap.metadata.fromCache) { clearTimeout(timer); if (!loaded) notice(""); loaded = true; }
+      loaded = true; render();
+    }, (e) => { clearTimeout(timer); loaded = true; render(); notice("Your list stopped syncing (" + e.code + "). Reload the page to reconnect.", true); });
+  })();
+
+  // ---------- intake ----------
+  $("#add").onclick = async () => {
+    if (!col) return;
+    const lines = $("#intake-text").value.split(/\n+/).map((l) => l.replace(/^\s*(?:[-*•▪◦]|\d+[.)]|\[[ xX]?\])\s*/, "").trim()).filter(Boolean);
+    if (!lines.length) return;
+    $("#intake-text").value = "";
+    const base = Date.now();
+    for (let i = 0; i < lines.length; i++) {
+      const ref = col.doc();
+      await write(ref.id, { text: lines[i].slice(0, 2000), status: "queued", created: base + i, summary: "", question: "", reply: "", proposals: [] }, "set").catch(() => {});
+    }
+  };
+
+  $("#clear-done").onclick = async () => {
+    for (const t of tasks.filter((t) => t.status === "done" && !(t.proposals || []).some((p) => p.state === "pending"))) await write(t.id, null, "delete").catch(() => {});
+  };
+  $("#perm").onclick = () => perms?.manage().catch(() => notice("Open the artifact's Permissions menu to change what this page can use."));
+
+  // ---------- running ----------
+  const isRunnable = (t) => !running.has(t.id) && (t.status === "queued" || t.status === "failed" || t.status === "working");
+
+  runBtn.onclick = async () => {
+    if (!sample || !col) return;
+    const todo = tasks.filter(isRunnable);
+    if (!todo.length) { notice("Nothing waiting. Add tasks, or reply to a task that has a question."); return; }
+    notice("");
+    // Ask for everything once, up front, so parallel helpers don't trip over consent prompts.
+    if (perms) await perms.request(["sample", "mcp"]).catch(() => {});
+    pool(todo, MAX_PARALLEL);
+  };
+  stopBtn.onclick = () => { for (const r of running.values()) r.ctl.abort(); };
+
+  async function pool(list, n) {
+    const q = list.slice();
+    const worker = async () => { while (q.length) { const t = q.shift(); if (!running.has(t.id)) await runTask(t.id); } };
+    await Promise.all(Array.from({ length: Math.min(n, q.length) }, worker));
+  }
+
+  function setLog(id, msg) { const r = running.get(id); if (r) { r.log = msg; const el = document.getElementById("log-" + id); if (el) el.textContent = msg; } }
+
+  async function connector(server, tool, input, signal) {
+    if (!mcp) throw new Error(server + " isn't available on this view.");
+    try {
+      const res = await mcp.callTool(server, tool, input, { signal });
+      const out = typeof res.payload === "string" ? res.payload : JSON.stringify(res.payload ?? res.content);
+      return out.length > 14000 ? out.slice(0, 14000) + " …(cut)" : out;
+    } catch (e) {
+      const why = { server_not_connected: "isn't connected. The user can add it in claude.ai Settings → Connectors", needs_reauth: "needs to be reconnected in claude.ai Settings → Connectors", not_in_manifest: "was not allowed for this page", blocked_by_policy: "is blocked by the organization", approval_required: "needs the user's approval" }[e?.code];
+      throw new Error(server + " " + (why || "returned an error: " + (e?.message || e?.code || "unknown")));
+    }
+  }
+
+  async function runTask(id) {
+    const t = tasks.find((x) => x.id === id); if (!t) return;
+    const ctl = new AbortController();
+    running.set(id, { ctl, log: "Starting…" });
+    const proposals = (t.proposals || []).filter((p) => p.state !== "discarded");
+    await write(id, { status: "working", summary: "", question: "" }).catch(() => {});
+    render(); syncButtons();
+
+    const addProposal = (p) => { p.id = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); p.state = "pending"; proposals.push(p); write(id, { proposals: proposals.slice() }).catch(() => {}); return "Saved for the user to review. It has NOT been sent; the user decides."; };
+    const arr = (v) => (Array.isArray(v) ? v : v ? String(v).split(/[,;]\s*/) : []).map(String).map((s) => s.trim()).filter(Boolean);
+
+    const tools = [
+      { name: "search_email", description: "Search the user's Gmail with Gmail query syntax (from:, to:, subject:, newer_than:7d, etc.). Returns matching threads with ids, subjects, senders and snippets.",
+        inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+        execute: (i, c) => { setLog(id, "Searching email: " + i.query); return connector(GMAIL, "search_threads", { query: String(i.query || ""), pageSize: 10, view: "THREAD_VIEW_SUMMARY" }, c.signal); } },
+      { name: "read_email_thread", description: "Read every message in one Gmail thread as plain text. Use a thread id from search_email.",
+        inputSchema: { type: "object", properties: { threadId: { type: "string" } }, required: ["threadId"] },
+        execute: (i, c) => { setLog(id, "Reading an email thread"); return connector(GMAIL, "get_thread", { threadId: String(i.threadId), messageFormat: "PLAIN_TEXT" }, c.signal); } },
+      { name: "list_calendar", description: "List events on the user's primary calendar between two local ISO times (no Z, e.g. 2026-11-09T00:00:00). Optional fullText filters by words.",
+        inputSchema: { type: "object", properties: { startTime: { type: "string" }, endTime: { type: "string" }, fullText: { type: "string" } }, required: ["startTime", "endTime"] },
+        execute: (i, c) => { setLog(id, "Checking the calendar"); const inp = { startTime: String(i.startTime), endTime: String(i.endTime), pageSize: 50, orderBy: "startTime" }; if (i.fullText) inp.fullText = String(i.fullText); return connector(CAL, "list_events", inp, c.signal); } },
+      { name: "find_free_time", description: "Suggest free time slots for the user and other attendees between two local ISO times.",
+        inputSchema: { type: "object", properties: { attendeeEmails: { type: "array", items: { type: "string" } }, startTime: { type: "string" }, endTime: { type: "string" }, durationMinutes: { type: "number" } }, required: ["attendeeEmails", "startTime", "endTime"] },
+        execute: (i, c) => { setLog(id, "Looking for free time"); return connector(CAL, "suggest_time", { attendeeEmails: arr(i.attendeeEmails), startTime: String(i.startTime), endTime: String(i.endTime), durationMinutes: Number(i.durationMinutes) || 30, preferences: { excludeWeekends: true, startHour: "09:00", endHour: "17:30" } }, c.signal); } },
+      { name: "search_drive", description: "Search the user's Google Drive. Query syntax: fullText contains 'words' or title contains 'words', combinable with and/or.",
+        inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+        execute: (i, c) => { setLog(id, "Searching Drive"); return connector(DRIVE, "search_files", { query: String(i.query || ""), pageSize: 8, snippetVerbosity: "MEDIUM" }, c.signal); } },
+      { name: "propose_email", description: "Prepare an email or reply for the USER TO REVIEW. It is never sent automatically; the user edits and approves it. For a reply, pass replyThreadId from search_email.",
+        inputSchema: { type: "object", properties: { to: { type: "array", items: { type: "string" } }, cc: { type: "array", items: { type: "string" } }, subject: { type: "string" }, body: { type: "string", description: "Plain text, no Markdown." }, replyThreadId: { type: "string" }, why: { type: "string", description: "One line for the user: why this email." } }, required: ["to", "subject", "body"] },
+        execute: (i) => { setLog(id, "Drafted an email for you to review"); return addProposal({ kind: "email", to: arr(i.to).join(", "), cc: arr(i.cc).join(", "), subject: String(i.subject || ""), body: String(i.body || ""), replyThreadId: i.replyThreadId ? String(i.replyThreadId) : "", why: String(i.why || "") }); } },
+      { name: "propose_event", description: "Prepare a calendar event (and invitations if attendees are given) for the USER TO REVIEW. Nothing is created until they approve. Times are local ISO without Z.",
+        inputSchema: { type: "object", properties: { summary: { type: "string" }, startTime: { type: "string" }, endTime: { type: "string" }, attendees: { type: "array", items: { type: "string" } }, location: { type: "string" }, description: { type: "string" }, why: { type: "string" } }, required: ["summary", "startTime", "endTime"] },
+        execute: (i) => { setLog(id, "Prepared a calendar event for you to review"); return addProposal({ kind: "event", summary: String(i.summary || ""), startTime: String(i.startTime || ""), endTime: String(i.endTime || ""), attendees: arr(i.attendees).join(", "), location: String(i.location || ""), description: String(i.description || ""), why: String(i.why || "") }); } },
+    ];
+
+    const now = new Date();
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const prior = (t.summary || t.question || t.reply) ? `\n\nEarlier attempt on this task:\nSummary: ${t.summary || "(none)"}\nQuestion you asked: ${t.question || "(none)"}\nUser's answer: ${t.reply || "(none)"}` : "";
+    const existing = proposals.length ? `\n\nAlready prepared for the user (do not duplicate): ${proposals.map((p) => p.kind + ": " + (p.subject || p.summary)).join("; ")}` : "";
+    const prompt = `You are one helper on the user's to-do list. Work on exactly ONE task and finish it as far as you safely can.
+
+Today is ${localNow} local time (${tz}).
+
+TASK: ${t.text}${prior}${existing}
+
+How to work:
+- Use the tools to look things up in the user's Gmail, Google Calendar and Google Drive. Search before you assume.
+- You cannot send email, create events or change anything yourself. When the task calls for an email, reply or invitation, use propose_email or propose_event so the user can review it. Write drafts ready to send, in the user's voice, short and plain.
+- Never invent email addresses, dates or facts. If something essential is missing, ask one clear question.
+- If a tool says a connector isn't connected, carry on with what you can and mention it.
+
+When finished, reply with ONLY a JSON object:
+{"status": "done" | "needs_approval" | "needs_you" | "cant_do", "summary": "2-5 short sentences for the user: what you found and did, with key facts like dates, amounts and names", "question": "only when status is needs_you"}
+Use "needs_approval" when you prepared something for the user to send.`;
+
+    try {
+      const out = await sample.json(prompt, { tools, signal: ctl.signal });
+      let status = ["done", "needs_approval", "needs_you", "cant_do"].includes(out?.status) ? out.status : "done";
+      if (proposals.some((p) => p.state === "pending") && status === "done") status = "needs_approval";
+      await write(id, { status, summary: String(out?.summary || "").slice(0, 4000), question: status === "needs_you" ? String(out?.question || "") : "", reply: "", proposals: proposals.slice() });
+    } catch (e) {
+      const code = e?.code;
+      if (code === "not_granted" || code === "sampling_disabled") notice("This page isn't allowed to use Claude. Use Permissions below to allow it.", true);
+      if (code === "rate_limited") notice("You've hit a usage limit. Try the remaining tasks a bit later.", true);
+      const msg = { cancelled: "Stopped.", rate_limited: "Paused by a usage limit.", invalid_json: "The helper finished without a clear answer.", refused: "Claude declined this task." }[code] || "Something went wrong (" + (code || "error") + ").";
+      await write(id, { status: code === "cancelled" ? "queued" : "failed", summary: msg, proposals: proposals.slice() }).catch(() => {});
+    } finally {
+      running.delete(id); render(); syncButtons();
+    }
+  }
+
+  // ---------- approvals ----------
+  async function act(taskId, propId, action) {
+    const t = tasks.find((x) => x.id === taskId); if (!t) return;
+    const props = (t.proposals || []).map((p) => ({ ...p }));
+    const p = props.find((x) => x.id === propId); if (!p) return;
+    const key = taskId + ":" + propId;
+    const val = (f) => document.getElementById(`f-${propId}-${f}`)?.value ?? p[f] ?? "";
+    // capture edits
+    for (const f of p.kind === "email" ? ["to", "cc", "subject", "body"] : ["summary", "startTime", "endTime", "attendees", "location", "description"]) p[f] = val(f);
+    const list = (s) => String(s || "").split(/[,;]\s*/).map((x) => x.trim()).filter(Boolean);
+
+    if (action === "discard") { p.state = "discarded"; }
+    else if (action === "ask") { confirmFor.add(key); await write(taskId, { proposals: props }).catch(() => {}); render(); return; }
+    else if (action === "cancel") { confirmFor.delete(key); render(); return; }
+    else {
+      confirmFor.delete(key);
+      p.busy = true; render();
+      try {
+        if (p.kind === "email") {
+          if (!list(p.to).length) throw { message: "Add at least one recipient." };
+          const input = { to: list(p.to), subject: p.subject, body: p.body };
+          if (list(p.cc).length) input.cc = list(p.cc);
+          if (action === "send") { if (p.replyThreadId) input.replyThreadId = p.replyThreadId; await mcp.callTool(GMAIL, "send_message", input); p.state = "sent"; }
+          else { await mcp.callTool(GMAIL, "create_draft", input); p.state = "drafted"; }
+        } else {
+          const input = { summary: p.summary, startTime: p.startTime, endTime: p.endTime };
+          if (list(p.attendees).length) input.attendees = list(p.attendees).map((email) => ({ email }));
+          if (p.location) input.location = p.location;
+          if (p.description) input.description = p.description;
+          await mcp.callTool(CAL, "create_event", input); p.state = "created";
+        }
+        p.error = "";
+      } catch (e) {
+        p.error = e?.code === "server_not_connected" ? "That connector isn't connected. Add it in claude.ai Settings → Connectors." :
+                  (e?.code === "server_unavailable" || e?.code === "upstream_error") ? "No clear answer came back, so it may have gone through. Check before trying again." :
+                  (e?.message || "Couldn't complete that.");
+      }
+      delete p.busy;
+    }
+    const allSettled = props.every((x) => x.state !== "pending");
+    const update = { proposals: props };
+    if (allSettled && t.status === "needs_approval") update.status = "done";
+    await write(taskId, update).catch(() => {});
+  }
+
+  async function replyAndRetry(id) {
+    const v = document.getElementById("reply-" + id)?.value.trim(); if (!v) return;
+    const t = tasks.find((x) => x.id === id); if (!t) return;
+    await write(id, { reply: v, status: "queued" }).catch(() => {});
+    t.reply = v; t.status = "queued";
+    if (sample) runTask(id);
+  }
+
+  // ---------- render ----------
+  const LABEL = { queued: "Queued", working: "Working", needs_approval: "Needs your OK", needs_you: "Question", done: "Done", cant_do: "Can't do", failed: "Failed" };
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function statusOf(t) { return running.has(t.id) ? "working" : t.status === "working" ? "failed" : t.status || "queued"; }
+
+  function propHTML(t, p) {
+    const key = t.id + ":" + p.id;
+    const F = (f, label, area) => `<label class="field"><span>${label}</span>${area ? `<textarea id="f-${p.id}-${f}" rows="6">${esc(p[f])}</textarea>` : `<input type="text" id="f-${p.id}-${f}" value="${esc(p[f])}">`}</label>`;
+    const done = p.state !== "pending";
+    const stateTxt = { sent: "Sent.", drafted: "Saved to your Gmail drafts.", created: "Added to your calendar.", discarded: "Discarded." }[p.state];
+    if (done) return `<div class="prop"><div class="prop-h"><span class="prop-kind">${p.kind === "email" ? "Email" : "Event"} · ${esc(p.subject || p.summary)}</span><span class="prop-state ok">${stateTxt || ""}</span></div></div>`;
+    const fields = p.kind === "email"
+      ? `<div class="two">${F("to", "To")}${F("cc", "Cc")}</div>${F("subject", "Subject")}${F("body", "Message", true)}`
+      : `${F("summary", "Title")}<div class="two">${F("startTime", "Starts")}${F("endTime", "Ends")}</div>${F("attendees", "Invite (emails)")}${F("location", "Location")}${F("description", "Notes", true)}`;
+    const confirming = confirmFor.has(key);
+    const sendLabel = p.kind === "email" ? "Send" : (p.attendees ? "Create & invite" : "Add to calendar");
+    const actions = p.busy ? `<span class="prop-state">Working…</span>` : confirming
+      ? `<div class="confirm"><div>${p.kind === "email" ? `Send this to <b>${esc(p.to)}</b> now?` : p.attendees ? `Create this event and email invitations to <b>${esc(p.attendees)}</b>?` : "Add this event to your calendar?"}</div>
+         <div class="row"><button class="go" data-act="send" data-t="${t.id}" data-p="${p.id}">Yes, ${p.kind === "email" ? "send it" : "do it"}</button><button data-act="cancel" data-t="${t.id}" data-p="${p.id}">Not yet</button></div></div>`
+      : `<div class="row"><button class="go" data-act="ask" data-t="${t.id}" data-p="${p.id}">${sendLabel}…</button>${p.kind === "email" ? `<button data-act="draft" data-t="${t.id}" data-p="${p.id}">Save as Gmail draft</button>` : ""}<button class="quiet" data-act="discard" data-t="${t.id}" data-p="${p.id}">Discard</button></div>`;
+    return `<div class="prop"><div class="prop-h"><span class="prop-kind">${p.kind === "email" ? (p.replyThreadId ? "Reply" : "Email") : "Calendar event"} · waiting for you</span></div>
+      ${p.why ? `<div class="prop-why">${esc(p.why)}</div>` : ""}${fields}
+      ${p.error ? `<div class="prop-state bad">${esc(p.error)}</div>` : ""}${actions}</div>`;
+  }
+
+  function render() {
+    if (!loaded) return;
+    const counts = {};
+    tasks.forEach((t) => { const s = statusOf(t); counts[s] = (counts[s] || 0) + 1; });
+    tallyEl.innerHTML = tasks.length ? ["working", "needs_approval", "needs_you", "done"].filter((k) => counts[k]).map((k) => `<span><b>${counts[k]}</b> ${LABEL[k]}</span>`).join("") + (counts.queued ? `<span><b>${counts.queued}</b> Queued</span>` : "") : "";
+    if (!tasks.length) { listEl.innerHTML = `<div class="empty">Your list is empty. Paste tasks above, one per line, then tap <b>Work through my list</b>.</div>`; syncButtons(); return; }
+
+    // keep in-progress edits across re-render
+    const keep = {}; listEl.querySelectorAll("input[id], textarea[id]").forEach((el) => { keep[el.id] = el.value; });
+    const focusId = document.activeElement?.id;
+
+    const order = { needs_approval: 0, needs_you: 1, working: 2, failed: 3, queued: 4, cant_do: 5, done: 6 };
+    const sorted = tasks.slice().sort((a, b) => (order[statusOf(a)] - order[statusOf(b)]) || (a.created - b.created));
+    listEl.innerHTML = sorted.map((t) => {
+      const s = statusOf(t);
+      const r = running.get(t.id);
+      const interrupted = !r && t.status === "working";
+      const props = (t.proposals || []).filter((p) => p.state !== "discarded");
+      return `<article class="ticket ${s === "needs_approval" ? "attn" : s === "needs_you" ? "ask" : s === "done" ? "done" : ""}">
+        <div class="t-top"><div class="t-text">${esc(t.text)}</div><span class="pill ${s}">${LABEL[s] || s}</span></div>
+        ${r ? `<div class="log" id="log-${t.id}">${esc(r.log)}</div>` : ""}
+        ${interrupted ? `<div class="log">Interrupted when the page closed. It will run again with the rest.</div>` : ""}
+        ${t.summary && !r ? `<div class="summary">${esc(t.summary)}</div>` : ""}
+        ${s === "needs_you" && t.question ? `<div class="question">${esc(t.question)}</div>
+          <div class="row"><input type="text" id="reply-${t.id}" placeholder="Your answer" style="flex:1;min-width:0"><button data-reply="${t.id}">Answer & retry</button></div>` : ""}
+        ${props.map((p) => propHTML(t, p)).join("")}
+        ${!r ? `<div class="row">${["failed", "cant_do", "done", "needs_you", "needs_approval"].includes(s) && sample ? `<button class="quiet" data-retry="${t.id}">Run again</button>` : ""}<button class="quiet" data-del="${t.id}">Remove</button></div>` : ""}
+      </article>`;
+    }).join("");
+
+    for (const [k, v] of Object.entries(keep)) { const el = document.getElementById(k); if (el) el.value = v; }
+    if (focusId) document.getElementById(focusId)?.focus();
+    syncButtons();
+  }
+
+  function syncButtons() {
+    const any = running.size > 0;
+    stopBtn.hidden = !any;
+    const waiting = tasks.filter(isRunnable).length;
+    runBtn.disabled = !sample || !col || (!waiting && !any) || (any && !waiting);
+    runBtn.textContent = any ? `Working on ${running.size}…` : waiting ? `Work through my list (${waiting})` : "Work through my list";
+  }
+
+  listEl.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.act) act(b.dataset.t, b.dataset.p, b.dataset.act);
+    else if (b.dataset.reply) replyAndRetry(b.dataset.reply);
+    else if (b.dataset.retry) { if (sample) runTask(b.dataset.retry); }
+    else if (b.dataset.del) { const r = running.get(b.dataset.del); r?.ctl.abort(); write(b.dataset.del, null, "delete").catch(() => {}); }
+  });
+  listEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id?.startsWith("reply-")) replyAndRetry(e.target.id.slice(6)); });
+})();
+</script>
